@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OCR 截图转文字</title>
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --card: #ffffff;
+    --primary: #0071e3;
+    --primary-hover: #0062cc;
+    --text: #1d1d1f;
+    --text-secondary: #6e6e73;
+    --border: #d2d2d7;
+    --danger: #dc3545;
+    --danger-hover: #bb2d3b;
+    --radius: 12px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 20px;
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    text-align: center;
+    padding: 16px 0 20px;
+  }
+  header h1 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+  }
+  header p {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin-top: 4px;
+  }
+
+  /* ---- 图片区域工具栏 ---- */
+  .image-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 16px;
+    background: var(--primary);
+    color: #fff;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .upload-btn:hover { background: var(--primary-hover); }
+  .upload-btn:active { background: #0052a3; }
+  .upload-btn svg { flex-shrink: 0; }
+  .toolbar-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  /* ---- 图片粘贴区 ---- */
+  .image-zone {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    flex: 1;
+    min-height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 12px;
+    border: 2px dashed var(--border);
+    transition: border-color 0.2s, background 0.2s;
+    cursor: default;
+  }
+  .image-zone:hover {
+    border-color: #b0b0b8;
+  }
+  .image-zone.drag-over {
+    border-color: var(--primary);
+    border-style: solid;
+    background: #e8f4fd;
+  }
+  .placeholder {
+    text-align: center;
+    color: var(--text-secondary);
+    pointer-events: none;
+    padding: 32px 16px;
+  }
+  .placeholder .icon {
+    font-size: 48px;
+    line-height: 1;
+    margin-bottom: 12px;
+    opacity: 0.4;
+  }
+  .placeholder p {
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+  .placeholder .hint {
+    font-size: 12px;
+    color: #999;
+  }
+  .image-preview {
+    display: none;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+
+  /* ---- 结果区 ---- */
+  .result-section {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 12px;
+    min-height: 120px;
+    border: 1px solid var(--border);
+  }
+  .result-section .label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .result-text {
+    flex: 1;
+    width: 100%;
+    min-height: 80px;
+    border: none;
+    outline: none;
+    resize: none;
+    font-size: 15px;
+    line-height: 1.6;
+    font-family: inherit;
+    color: var(--text);
+    background: transparent;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .result-text:empty::before {
+    content: "识别结果将显示在这里...";
+    color: #c7c7cc;
+  }
+
+  /* ---- 按钮 ---- */
+  .actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+  .btn {
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+    font-family: inherit;
+  }
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--primary);
+    color: #fff;
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+  .btn-outline {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-outline:hover:not(:disabled) { background: #f0f0f0; }
+  .btn-clear {
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid var(--border);
+  }
+  .btn-clear:hover:not(:disabled) { background: #fff0f0; }
+
+  /* ---- 状态栏 ---- */
+  .status-bar {
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-secondary);
+    padding: 8px 0 4px;
+    min-height: 20px;
+  }
+  .status-bar .error { color: var(--danger); }
+
+  /* spinner */
+  .spinner {
+    display: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status-bar.processing .spinner { display: inline-block; }
+</style>
+</head>
+<body>
+<div class="app-container">
+  <header>
+    <h1>OCR 截图转文字</h1>
+    <p>上传或粘贴截图，自动识别文字</p>
+  </header>
+
+  <!-- 图片区域工具栏 -->
+  <div class="image-toolbar">
+    <label class="upload-btn" id="uploadBtn" title="选择图片文件上传">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M8 1.5v9M4.5 5L8 1.5 11.5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M1.5 10.5v2a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>上传图片</span>
+      <input type="file" accept="image/*" id="fileInput" hidden>
+    </label>
+    <span class="toolbar-hint">点击左侧按钮在访达中选择文件，或直接在下方区域 Cmd+V 粘贴 / 拖拽图片</span>
+  </div>
+
+  <!-- 图片粘贴区（仅支持粘贴 Cmd+V 和拖拽，点击不弹窗） -->
+  <div class="image-zone" id="imageZone">
+    <div class="placeholder" id="placeholder">
+      <div class="icon">&#128196;</div>
+      <p>按 Cmd+V 粘贴截图到此处</p>
+      <p class="hint">支持 PNG / JPG / GIF / BMP / WebP，也可拖拽图片到此处</p>
+    </div>
+    <img class="image-preview" id="imagePreview" alt="截图预览">
+  </div>
+
+  <!-- 结果区域 -->
+  <div class="result-section">
+    <div class="label">
+      <span>识别结果</span>
+      <span style="font-weight:400;text-transform:none;font-size:11px" id="charCount"></span>
+    </div>
+    <div class="result-text" id="resultText" contenteditable="true"></div>
+  </div>
+
+  <!-- 按钮 -->
+  <div class="actions">
+    <button class="btn btn-clear" id="clearBtn" onclick="clearAll()">清除</button>
+    <button class="btn btn-primary" id="copyBtn" disabled onclick="copyResult()">复制到剪贴板</button>
+  </div>
+
+  <!-- 状态栏 -->
+  <div class="status-bar" id="statusBar">
+    <span class="spinner"></span><span id="statusText">就绪 — 按 Cmd+V 粘贴截图</span>
+  </div>
+</div>
+
+<script>
+const imageZone = document.getElementById("imageZone");
+const imagePreview = document.getElementById("imagePreview");
+const placeholder = document.getElementById("placeholder");
+const resultText = document.getElementById("resultText");
+const copyBtn = document.getElementById("copyBtn");
+const statusBar = document.getElementById("statusBar");
+const statusText = document.getElementById("statusText");
+const charCount = document.getElementById("charCount");
+const fileInput = document.getElementById("fileInput");
+
+let currentBlob = null;
+
+// 上传按钮
+fileInput.addEventListener("change", function() {
+  if (this.files[0]) {
+    handleImage(this.files[0]);
+    this.value = ""; // 允许重复上传同一文件
+  }
+});
+
+function setStatus(msg, isError) {
+  statusBar.classList.remove("processing");
+  statusText.textContent = msg;
+  statusText.className = isError ? "error" : "";
+}
+
+function setProcessing(msg) {
+  statusBar.classList.add("processing");
+  statusText.textContent = msg;
+  statusText.className = "";
+}
+
+function updateCopyBtn() {
+  const text = resultText.innerText.trim();
+  copyBtn.disabled = !text;
+  charCount.textContent = text ? `${text.length} 字` : "";
+}
+
+resultText.addEventListener("input", updateCopyBtn);
+
+// 处理图片
+function handleImage(file) {
+  if (!file.type.startsWith("image/")) {
+    setStatus("请粘贴图片文件", true);
+    return;
+  }
+
+  currentBlob = file;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    imagePreview.src = e.target.result;
+    imagePreview.style.display = "block";
+    placeholder.style.display = "none";
+    runOCR(e.target.result);
+  };
+  reader.readAsDataURL(file);
+}
+
+async function runOCR(dataUrl) {
+  setProcessing("正在识别...");
+  resultText.innerText = "";
+  copyBtn.disabled = true;
+
+  try {
+    const resp = await fetch("/ocr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: dataUrl }),
+    });
+
+    const data = await resp.json();
+    if (data.error) {
+      setStatus(data.error, true);
+    } else {
+      resultText.innerText = data.text || "";
+      updateCopyBtn();
+      setStatus(`识别完成 — ${(data.text || "").length} 字`);
+    }
+  } catch (err) {
+    setStatus(`网络错误: ${err.message}`, true);
+  }
+}
+
+// Cmd+V 粘贴
+document.addEventListener("paste", function(e) {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith("image/")) {
+      e.preventDefault();
+      handleImage(item.getAsFile());
+      return;
+    }
+  }
+});
+
+// 拖拽
+imageZone.addEventListener("dragover", function(e) {
+  e.preventDefault();
+  imageZone.classList.add("drag-over");
+});
+imageZone.addEventListener("dragleave", function() {
+  imageZone.classList.remove("drag-over");
+});
+imageZone.addEventListener("drop", function(e) {
+  e.preventDefault();
+  imageZone.classList.remove("drag-over");
+  const file = e.dataTransfer.files[0];
+  if (file) handleImage(file);
+});
+
+function clearAll() {
+  imagePreview.style.display = "none";
+  placeholder.style.display = "";
+  imagePreview.src = "";
+  resultText.innerText = "";
+  currentBlob = null;
+  copyBtn.disabled = true;
+  charCount.textContent = "";
+  setStatus("就绪 — 按 Cmd+V 粘贴截图");
+}
+
+async function copyResult() {
+  const text = resultText.innerText.trim();
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    const orig = copyBtn.textContent;
+    copyBtn.textContent = "已复制 ✓";
+    setTimeout(() => { copyBtn.textContent = orig; }, 1500);
+  } catch {
+    // fallback
+    resultText.select();
+    document.execCommand("copy");
+    setStatus("已复制（请手动选择文字后 Cmd+C）", true);
+  }
+}
+</script>
+</body>
+</html>
