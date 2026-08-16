@@ -23,8 +23,8 @@
 ## 安装
 
 ```bash
-git clone https://github.com/quaresun/article-to-knowledge-cards.git
-cd article-to-knowledge-cards
+git clone https://github.com/quaresun/OCR.git
+cd OCR
 
 # 创建虚拟环境（推荐）
 python3 -m venv .venv
