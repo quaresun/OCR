@@ -8,7 +8,7 @@ def test_home_page_contains_paste_and_drag_handlers():
 
     assert 'addEventListener("paste"' in html
     assert 'addEventListener("drop"' in html
-    assert 'accept = "image/*"' in html
+    assert 'accept="image/*"' in html
 
 
 def test_home_page_contains_copy_and_clear_actions():
